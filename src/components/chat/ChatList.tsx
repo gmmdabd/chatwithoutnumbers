@@ -1,76 +1,92 @@
 
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Search, PlusCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Search, PlusCircle, UserPlus } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-
-// Dummy data for chat list
-const dummyChats = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    lastMessage: 'Hey, how are you doing?',
-    time: '2m ago',
-    unread: 3,
-    avatar: null,
-    status: 'online' as const,
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    lastMessage: 'Can you send me the document?',
-    time: '1h ago',
-    unread: 0,
-    avatar: null,
-    status: 'away' as const,
-  },
-  {
-    id: '3',
-    name: 'Carol Williams',
-    lastMessage: 'Looking forward to our meeting!',
-    time: '3h ago',
-    unread: 0,
-    avatar: null,
-    status: 'offline' as const,
-  },
-  {
-    id: '4',
-    name: 'Design Team',
-    lastMessage: 'Dave: I just pushed the new changes',
-    time: 'Yesterday',
-    unread: 5,
-    avatar: null,
-    status: null,
-  },
-  {
-    id: '5',
-    name: 'Eva Davis',
-    lastMessage: 'Thanks for your help!',
-    time: 'Yesterday',
-    unread: 0,
-    avatar: null,
-    status: 'busy' as const,
-  },
-];
+import { useConversations } from '@/hooks/useConversations';
+import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Conversation, ConversationParticipant } from '@/types/chat';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 
 const ChatList: React.FC = () => {
-  const location = useLocation();
+  const { conversations, loading, createConversation } = useConversations();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const { user } = useAuth();
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
+  const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
+  const navigate = useNavigate();
   
-  const filteredChats = dummyChats.filter(chat => 
-    chat.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    chat.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredChats = conversations.filter(chat => {
+    const participants = chat.participants || [];
+    const otherParticipants = participants.filter(p => p.user_id !== user?.id);
+    const chatName = chat.is_group 
+      ? chat.name 
+      : otherParticipants[0]?.user?.username || 'Unknown User';
+    
+    const lastMessage = chat.last_message?.content || '';
+    
+    return chatName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      lastMessage.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const handleStartDirectChat = async (userId: string) => {
+    if (!user) return;
+    const conversationId = await createConversation([userId]);
+    if (conversationId) {
+      navigate(`/chat/${conversationId}`);
+      setIsNewChatOpen(false);
+    }
+  };
+
+  const handleCreateGroupChat = async (name: string, userIds: string[]) => {
+    if (!user) return;
+    const conversationId = await createConversation(userIds, name, true);
+    if (conversationId) {
+      navigate(`/chat/${conversationId}`);
+      setIsNewGroupOpen(false);
+    }
+  };
 
   return (
     <div className="w-full h-full bg-white dark:bg-gray-900 border-r flex flex-col">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-semibold">Messages</h1>
-          <button className="text-brand-blue hover:bg-brand-light-blue p-2 rounded-full transition-colors">
-            <PlusCircle size={22} />
-          </button>
+          <div className="flex items-center space-x-2">
+            <Dialog open={isNewChatOpen} onOpenChange={setIsNewChatOpen}>
+              <DialogTrigger asChild>
+                <button className="text-brand-blue hover:bg-brand-light-blue p-2 rounded-full transition-colors">
+                  <UserPlus size={22} />
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Conversation</DialogTitle>
+                </DialogHeader>
+                <NewDirectChatForm onStartChat={handleStartDirectChat} />
+              </DialogContent>
+            </Dialog>
+            
+            <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
+              <DialogTrigger asChild>
+                <button className="text-brand-blue hover:bg-brand-light-blue p-2 rounded-full transition-colors">
+                  <PlusCircle size={22} />
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Group Chat</DialogTitle>
+                </DialogHeader>
+                <NewGroupChatForm onCreateGroup={handleCreateGroupChat} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         <div className="relative">
           <Search 
@@ -88,14 +104,19 @@ const ChatList: React.FC = () => {
       </div>
       
       <div className="flex-1 overflow-y-auto">
-        {filteredChats.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full p-4">
+            <p className="text-muted-foreground">Loading conversations...</p>
+          </div>
+        ) : filteredChats.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-            <p className="text-muted-foreground">No conversations found</p>
+            <p className="text-muted-foreground mb-4">No conversations found</p>
+            <Button onClick={() => setIsNewChatOpen(true)}>Start a Conversation</Button>
           </div>
         ) : (
           <ul>
             {filteredChats.map((chat) => (
-              <ChatListItem key={chat.id} chat={chat} />
+              <ChatListItem key={chat.id} chat={chat} currentUserId={user?.id} />
             ))}
           </ul>
         )}
@@ -105,20 +126,49 @@ const ChatList: React.FC = () => {
 };
 
 interface ChatItemProps {
-  chat: {
-    id: string;
-    name: string;
-    lastMessage: string;
-    time: string;
-    unread: number;
-    avatar: string | null;
-    status: 'online' | 'away' | 'offline' | 'busy' | null;
-  };
+  chat: Conversation;
+  currentUserId: string | undefined;
 }
 
-const ChatListItem: React.FC<ChatItemProps> = ({ chat }) => {
-  const location = useLocation();
-  const isActive = location.pathname === `/chat/${chat.id}`;
+const ChatListItem: React.FC<ChatItemProps> = ({ chat, currentUserId }) => {
+  const { chatId } = useParams();
+  const isActive = chatId === chat.id;
+  
+  const participants = chat.participants || [];
+  const otherParticipants = participants.filter(p => p.user_id !== currentUserId);
+  
+  // For direct messages, show the other person's name
+  // For group chats, show the group name
+  const chatName = chat.is_group 
+    ? chat.name 
+    : otherParticipants[0]?.user?.username || 'Unknown User';
+
+  // Get the avatar for direct messages or first letter for group chats
+  const avatarText = chat.is_group 
+    ? (chat.name || 'G').charAt(0).toUpperCase()
+    : (otherParticipants[0]?.user?.username || 'U').charAt(0).toUpperCase();
+    
+  // Get avatar status for direct messages
+  const status = chat.is_group 
+    ? null 
+    : getRandomStatus(); // This would be replaced with actual online status
+    
+  // Calculate unread messages (placeholder)
+  const unread = Math.floor(Math.random() * 5); // This would be replaced with actual unread count
+  
+  // Format the time
+  const time = chat.last_message?.created_at 
+    ? formatDistanceToNow(new Date(chat.last_message.created_at), { addSuffix: true })
+    : 'No messages';
+    
+  // Get the last message content
+  const lastMessage = chat.last_message?.content || 'No messages yet';
+  
+  // Helper function for random status (placeholder)
+  function getRandomStatus() {
+    const statuses = ['online', 'away', 'offline', 'busy'];
+    return statuses[Math.floor(Math.random() * statuses.length)] as 'online' | 'away' | 'offline' | 'busy';
+  }
   
   return (
     <li>
@@ -130,28 +180,203 @@ const ChatListItem: React.FC<ChatItemProps> = ({ chat }) => {
         )}
       >
         <Avatar 
-          className={chat.status ? `border-2 border-${chat.status === 'online' ? 'green' : chat.status === 'away' ? 'yellow' : chat.status === 'busy' ? 'red' : 'gray'}-500` : ''}
+          className={!chat.is_group && status ? `border-2 border-${status === 'online' ? 'green' : status === 'away' ? 'yellow' : status === 'busy' ? 'red' : 'gray'}-500` : ''}
         >
           <span className="flex h-full w-full items-center justify-center font-medium">
-            {chat.name.split(' ').map(n => n[0]).join('')}
+            {avatarText}
           </span>
         </Avatar>
         <div className="ml-3 flex-1 overflow-hidden">
           <div className="flex justify-between items-baseline">
-            <h3 className="font-medium truncate">{chat.name}</h3>
-            <span className="text-xs text-gray-500 whitespace-nowrap ml-2">{chat.time}</span>
+            <h3 className="font-medium truncate">{chatName}</h3>
+            <span className="text-xs text-gray-500 whitespace-nowrap ml-2">{time}</span>
           </div>
           <div className="flex justify-between items-center mt-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{chat.lastMessage}</p>
-            {chat.unread > 0 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{lastMessage}</p>
+            {unread > 0 && (
               <span className="ml-2 flex-shrink-0 w-5 h-5 bg-brand-blue rounded-full text-xs text-white flex items-center justify-center">
-                {chat.unread}
+                {unread}
               </span>
             )}
           </div>
         </div>
       </Link>
     </li>
+  );
+};
+
+const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = ({ onStartChat }) => {
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${searchUsername}%`)
+        .neq('id', user?.id)
+        .limit(10);
+        
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error: any) {
+      console.error('Error searching users:', error.message);
+      toast.error('Failed to search users');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex space-x-2">
+        <Input
+          placeholder="Search by username"
+          value={searchUsername}
+          onChange={(e) => setSearchUsername(e.target.value)}
+        />
+        <Button onClick={handleSearch} disabled={loading}>
+          {loading ? 'Searching...' : 'Search'}
+        </Button>
+      </div>
+      
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {searchResults.length === 0 ? (
+          <p className="text-center text-muted-foreground py-4">
+            {searchUsername.trim() ? 'No users found' : 'Search for users to start a conversation'}
+          </p>
+        ) : (
+          searchResults.map(user => (
+            <div key={user.id} className="flex items-center justify-between p-3 border rounded-md">
+              <div className="flex items-center">
+                <Avatar>
+                  <span className="flex h-full w-full items-center justify-center font-medium">
+                    {(user.username || 'U').charAt(0).toUpperCase()}
+                  </span>
+                </Avatar>
+                <span className="ml-3">{user.username}</span>
+              </div>
+              <Button size="sm" onClick={() => onStartChat(user.id)}>
+                Chat
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const NewGroupChatForm: React.FC<{ onCreateGroup: (name: string, userIds: string[]) => void }> = ({ onCreateGroup }) => {
+  const [groupName, setGroupName] = useState('');
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${searchUsername}%`)
+        .neq('id', user?.id)
+        .limit(10);
+        
+      if (error) throw error;
+      
+      // Filter out already selected users
+      const filteredResults = (data || []).filter(
+        result => !selectedUsers.some(selected => selected.id === result.id)
+      );
+      
+      setSearchResults(filteredResults);
+    } catch (error: any) {
+      console.error('Error searching users:', error.message);
+      toast.error('Failed to search users');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const addUser = (user: any) => {
+    setSelectedUsers([...selectedUsers, user]);
+    setSearchResults(searchResults.filter(result => result.id !== user.id));
+    setSearchUsername('');
+  };
+  
+  const removeUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter(selected => selected.id !== userId));
+  };
+  
+  const handleCreateGroup = () => {
+    if (!groupName.trim()) {
+      toast.error('Please enter a group name');
+      return;
+    }
+    
+    if (selectedUsers.length === 0) {
+      toast.error('Please add at least one user to the group');
+      return;
+    }
+    
+    const userIds = selectedUsers.map(user => user.id);
+    onCreateGroup(groupName, userIds);
+  };
+  
+  return (
+    <div className="space-y-4 mt-4">
+      <Input
+        placeholder="Group Name"
+        value={groupName}
+        onChange={(e) => setGroupName(e.target.value)}
+      />
+      
+      <div className="flex flex-wrap gap-2 min-h-8">
+        {selectedUsers.map(user => (
+          <div key={user.id} className="flex items-center bg-brand-light-blue text-brand-blue px-2 py-1 rounded-full text-sm">
+            {user.username}
+            <button className="ml-1" onClick={() => removeUser(user.id)}>×</button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex space-x-2">
+        <Input
+          placeholder="Search users to add"
+          value={searchUsername}
+          onChange={(e) => setSearchUsername(e.target.value)}
+        />
+        <Button onClick={handleSearch} disabled={loading}>
+          {loading ? '...' : 'Search'}
+        </Button>
+      </div>
+      
+      <div className="space-y-2 max-h-40 overflow-y-auto">
+        {searchResults.map(user => (
+          <div key={user.id} className="flex items-center justify-between p-2 border rounded-md">
+            <span>{user.username}</span>
+            <Button size="sm" variant="outline" onClick={() => addUser(user)}>
+              Add
+            </Button>
+          </div>
+        ))}
+      </div>
+      
+      <Button className="w-full" onClick={handleCreateGroup} disabled={!groupName.trim() || selectedUsers.length === 0}>
+        Create Group Chat
+      </Button>
+    </div>
   );
 };
 
