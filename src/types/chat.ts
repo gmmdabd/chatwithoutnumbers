@@ -21,8 +21,10 @@ export type ConversationParticipant = {
     id: string;
     username: string | null;
     avatar_url: string | null;
-  };
+  } | null;
 };
+
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 
 export type Message = {
   id: string;
@@ -32,7 +34,7 @@ export type Message = {
   content_type: 'text' | 'image' | 'video' | 'audio' | 'file';
   file_url: string | null;
   replied_to_id: string | null;
-  replied_to_message?: Message;
+  replied_to_message?: Message | null;
   is_forwarded: boolean;
   disappears_at: string | null;
   created_at: string;
@@ -41,7 +43,7 @@ export type Message = {
     id: string;
     username: string | null;
     avatar_url: string | null;
-  };
+  } | null;
   reactions?: MessageReaction[];
 };
 

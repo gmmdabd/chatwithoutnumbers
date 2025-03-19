@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Check, CheckCheck, Clock, Reply, Forward, Trash, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Message, MessageReaction } from '@/types/chat';
+import { Message, MessageReaction, MessageStatus } from '@/types/chat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
@@ -31,7 +30,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const { user } = useAuth();
   
   const isOutgoing = message.sender_id === user?.id;
-  const status = 'read'; // This would be dynamic in a real app
+  const status: MessageStatus = 'read'; // This would be dynamic in a real app
   
   // Format timestamp
   const timeString = message.created_at 
@@ -64,17 +63,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     .map(r => r.reaction);
     
   const statusIcon = () => {
-    switch (status) {
-      case 'sending':
-        return <Clock size={14} />;
-      case 'sent':
-        return <Check size={14} />;
-      case 'delivered':
-        return <CheckCheck size={14} />;
-      case 'read':
-        return <CheckCheck size={14} className="text-blue-400" />;
-      default:
-        return null;
+    if (status === 'sending') {
+      return <Clock size={14} />;
+    } else if (status === 'sent') {
+      return <Check size={14} />;
+    } else if (status === 'delivered') {
+      return <CheckCheck size={14} />;
+    } else if (status === 'read') {
+      return <CheckCheck size={14} className="text-blue-400" />;
+    } else {
+      return null;
     }
   };
   

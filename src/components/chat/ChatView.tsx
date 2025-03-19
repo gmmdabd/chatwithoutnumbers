@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Paperclip, Mic, Image, Smile, Forward, Timer, Users } from 'lucide-react';
@@ -61,8 +60,24 @@ const ChatView: React.FC = () => {
           
         if (error) throw error;
         
-        setConversation(data);
-        setParticipants(data.participants || []);
+        const typedParticipants: ConversationParticipant[] = (data.participants || []).map(
+          (p: any) => ({
+            ...p,
+            user: typeof p.user === 'object' && p.user !== null ? p.user : null
+          })
+        );
+        
+        const typedConversation: Conversation = {
+          id: data.id,
+          name: data.name,
+          is_group: data.is_group,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          participants: typedParticipants
+        };
+        
+        setConversation(typedConversation);
+        setParticipants(typedParticipants);
       } catch (error: any) {
         console.error('Error fetching conversation:', error.message);
         toast.error('Failed to load conversation');
@@ -120,17 +135,14 @@ const ChatView: React.FC = () => {
     setIsAttaching(true);
     
     try {
-      // Determine content type
       let contentType: 'image' | 'video' | 'audio' | 'file' = 'file';
       if (file.type.startsWith('image/')) contentType = 'image';
       else if (file.type.startsWith('video/')) contentType = 'video';
       else if (file.type.startsWith('audio/')) contentType = 'audio';
       
-      // Upload file
       const fileUrl = await uploadAttachment(file);
       if (!fileUrl) throw new Error('Failed to upload file');
       
-      // Send message with file
       const options: any = {};
       if (replyingTo) options.repliedToId = replyingTo;
       if (disappearTime) {
@@ -155,7 +167,6 @@ const ChatView: React.FC = () => {
       toast.error('Failed to attach file');
     } finally {
       setIsAttaching(false);
-      // Clear file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -232,7 +243,7 @@ const ChatView: React.FC = () => {
   const conversationStatus = conversation?.is_group
     ? `${participants.length} members`
     : 'Online'; // This would be dynamic in a real app
-    
+  
   if (isLoading || messagesLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -255,7 +266,6 @@ const ChatView: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-card overflow-hidden border">
-      {/* Chat header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center">
           <Link to="/chat" className="lg:hidden mr-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
@@ -282,7 +292,6 @@ const ChatView: React.FC = () => {
         )}
       </div>
       
-      {/* Messages container */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -306,7 +315,6 @@ const ChatView: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Reply to message */}
       {replyingToMessage && (
         <div className="px-4 py-2 border-t bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
           <div className="flex items-center">
@@ -329,7 +337,6 @@ const ChatView: React.FC = () => {
         </div>
       )}
       
-      {/* Input area */}
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
           <div className="flex space-x-1">
@@ -430,7 +437,6 @@ const ChatView: React.FC = () => {
         </form>
       </div>
       
-      {/* Dialog for forwarding messages */}
       <Dialog open={isForwarding} onOpenChange={setIsForwarding}>
         <DialogContent>
           <DialogHeader>
@@ -443,7 +449,6 @@ const ChatView: React.FC = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Dialog for showing participants */}
       <Dialog open={isShowingParticipants} onOpenChange={setIsShowingParticipants}>
         <DialogContent>
           <DialogHeader>
@@ -519,7 +524,27 @@ const ForwardMessageList: React.FC<{
           
         if (error) throw error;
         
-        setConversations(data.filter(c => c.id !== currentConversationId) || []);
+        const filteredConversations: Conversation[] = (data || [])
+          .filter(c => c.id !== currentConversationId)
+          .map(c => {
+            const typedParticipants: ConversationParticipant[] = (c.participants || []).map(
+              (p: any) => ({
+                ...p,
+                user: typeof p.user === 'object' && p.user !== null ? p.user : null
+              })
+            );
+            
+            return {
+              id: c.id,
+              name: c.name,
+              is_group: c.is_group,
+              created_at: c.created_at,
+              updated_at: c.updated_at,
+              participants: typedParticipants
+            };
+          });
+        
+        setConversations(filteredConversations);
       } catch (error: any) {
         console.error('Error fetching conversations for forward:', error.message);
         toast.error('Failed to load conversations');
@@ -557,7 +582,7 @@ const ForwardMessageList: React.FC<{
           >
             <Avatar>
               <span className="flex h-full w-full items-center justify-center font-medium">
-                {name.charAt(0).toUpperCase()}
+                {name?.charAt(0).toUpperCase() || 'U'}
               </span>
             </Avatar>
             <span className="ml-3">{name}</span>

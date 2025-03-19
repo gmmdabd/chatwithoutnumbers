@@ -50,7 +50,15 @@ export const useConversations = () => {
         
         // Get the last message for each conversation
         const conversationsWithLastMessage = await Promise.all(
-          data.map(async (conversation) => {
+          (data || []).map(async (conversation) => {
+            // Transform participants to handle Supabase error cases
+            const typedParticipants: ConversationParticipant[] = (conversation.participants || []).map(
+              (p: any) => ({
+                ...p,
+                user: typeof p.user === 'object' && p.user !== null ? p.user : null
+              })
+            );
+            
             const { data: messagesData, error: messagesError } = await supabase
               .from('messages')
               .select('*')
@@ -60,10 +68,16 @@ export const useConversations = () => {
               
             if (messagesError) throw messagesError;
             
-            return {
+            const typedConversation: Conversation = {
               ...conversation,
-              last_message: messagesData && messagesData.length > 0 ? messagesData[0] : null
+              participants: typedParticipants,
+              last_message: messagesData && messagesData.length > 0 ? {
+                ...messagesData[0],
+                content_type: (messagesData[0].content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file'
+              } : undefined
             };
+            
+            return typedConversation;
           })
         );
         

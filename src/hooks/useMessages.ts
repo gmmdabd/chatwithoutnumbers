@@ -30,7 +30,16 @@ export const useMessages = (conversationId: string | undefined) => {
           
         if (error) throw error;
         
-        setMessages(data || []);
+        // Transform data to match the expected types
+        const typedMessages: Message[] = (data || []).map(msg => ({
+          ...msg,
+          content_type: (msg.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
+          sender: msg.sender || null,
+          replied_to_message: msg.replied_to_message || null,
+          reactions: msg.reactions || []
+        }));
+        
+        setMessages(typedMessages);
       } catch (error: any) {
         console.error('Error fetching messages:', error.message);
         toast.error('Failed to load messages');
