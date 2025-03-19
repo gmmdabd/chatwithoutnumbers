@@ -34,7 +34,17 @@ export type Message = {
   content_type: 'text' | 'image' | 'video' | 'audio' | 'file';
   file_url: string | null;
   replied_to_id: string | null;
-  replied_to_message?: Message | null;
+  replied_to_message?: {
+    id: string;
+    content: string | null;
+    content_type: 'text' | 'image' | 'video' | 'audio' | 'file';
+    sender_id: string | null;
+    sender?: {
+      id: string;
+      username: string | null;
+      avatar_url: string | null;
+    } | null;
+  } | null;
   is_forwarded: boolean;
   disappears_at: string | null;
   created_at: string;

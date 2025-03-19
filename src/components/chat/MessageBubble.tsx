@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Check, CheckCheck, Clock, Reply, Forward, Trash, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -63,16 +64,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     .map(r => r.reaction);
     
   const statusIcon = () => {
-    if (status === 'sending') {
-      return <Clock size={14} />;
-    } else if (status === 'sent') {
-      return <Check size={14} />;
-    } else if (status === 'delivered') {
-      return <CheckCheck size={14} />;
-    } else if (status === 'read') {
-      return <CheckCheck size={14} className="text-blue-400" />;
-    } else {
-      return null;
+    switch(status) {
+      case 'sending':
+        return <Clock size={14} />;
+      case 'sent':
+        return <Check size={14} />;
+      case 'delivered':
+        return <CheckCheck size={14} />;
+      case 'read':
+        return <CheckCheck size={14} className="text-blue-400" />;
+      default:
+        return null;
     }
   };
   

@@ -31,13 +31,25 @@ export const useMessages = (conversationId: string | undefined) => {
         if (error) throw error;
         
         // Transform data to match the expected types
-        const typedMessages: Message[] = (data || []).map(msg => ({
-          ...msg,
-          content_type: (msg.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
-          sender: msg.sender || null,
-          replied_to_message: msg.replied_to_message || null,
-          reactions: msg.reactions || []
-        }));
+        const typedMessages: Message[] = (data || []).map(msg => {
+          // Handle replied_to_message correctly
+          let typedRepliedToMessage = null;
+          if (msg.replied_to_message) {
+            typedRepliedToMessage = {
+              ...msg.replied_to_message,
+              content_type: (msg.replied_to_message.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
+              sender: msg.replied_to_message.sender || null
+            };
+          }
+          
+          return {
+            ...msg,
+            content_type: (msg.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
+            sender: msg.sender || null,
+            replied_to_message: typedRepliedToMessage,
+            reactions: msg.reactions || []
+          };
+        });
         
         setMessages(typedMessages);
       } catch (error: any) {
