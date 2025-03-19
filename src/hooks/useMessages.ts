@@ -45,7 +45,7 @@ export const useMessages = (conversationId: string | undefined) => {
           // Handle sender properly checking if it's a valid object or an error object
           const typedSender = msg.sender && 
             typeof msg.sender === 'object' && 
-            !('error' in msg.sender) ? 
+            !(msg.sender && typeof msg.sender === 'object' && 'error' in msg.sender) ? 
             msg.sender : null;
           
           return {

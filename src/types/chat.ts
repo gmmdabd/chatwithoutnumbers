@@ -55,6 +55,7 @@ export type Message = {
     avatar_url: string | null;
   } | null;
   reactions?: MessageReaction[];
+  status?: MessageStatus;
 };
 
 export type MessageReaction = {

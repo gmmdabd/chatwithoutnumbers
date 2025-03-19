@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Search, PlusCircle, UserPlus } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
@@ -212,7 +212,10 @@ const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = (
   const { user } = useAuth();
   
   const handleSearch = async () => {
-    if (!searchUsername.trim()) return;
+    if (!searchUsername.trim()) {
+      setSearchResults([]);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -220,7 +223,7 @@ const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = (
         .from('profiles')
         .select('*')
         .ilike('username', `%${searchUsername}%`)
-        .neq('id', user?.id)
+        .neq('id', user?.id || '')
         .limit(10);
         
       if (error) throw error;
@@ -228,10 +231,24 @@ const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = (
     } catch (error: any) {
       console.error('Error searching users:', error.message);
       toast.error('Failed to search users');
+      setSearchResults([]);
     } finally {
       setLoading(false);
     }
   };
+  
+  // Auto-search when the user types
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchUsername.trim()) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchUsername]);
   
   return (
     <div className="space-y-4 mt-4">
@@ -240,16 +257,14 @@ const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = (
           placeholder="Search by username"
           value={searchUsername}
           onChange={(e) => setSearchUsername(e.target.value)}
+          className="flex-1"
         />
-        <Button onClick={handleSearch} disabled={loading}>
-          {loading ? 'Searching...' : 'Search'}
-        </Button>
       </div>
       
       <div className="space-y-2 max-h-60 overflow-y-auto">
         {searchResults.length === 0 ? (
           <p className="text-center text-muted-foreground py-4">
-            {searchUsername.trim() ? 'No users found' : 'Search for users to start a conversation'}
+            {searchUsername.trim() && !loading ? 'No users found' : 'Search for users to start a conversation'}
           </p>
         ) : (
           searchResults.map(user => (
@@ -267,6 +282,9 @@ const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = (
               </Button>
             </div>
           ))
+        )}
+        {loading && (
+          <p className="text-center text-muted-foreground py-2">Searching...</p>
         )}
       </div>
     </div>

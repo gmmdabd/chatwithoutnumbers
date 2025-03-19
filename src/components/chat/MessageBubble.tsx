@@ -1,266 +1,400 @@
-
-import React, { useState } from 'react';
-import { Check, CheckCheck, Clock, Reply, Forward, Trash, Smile } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Search, PlusCircle, UserPlus } from 'lucide-react';
+import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { Message, MessageReaction, MessageStatus } from '@/types/chat';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { formatDistanceToNow } from 'date-fns';
+import { useConversations } from '@/hooks/useConversations';
 import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Conversation, ConversationParticipant } from '@/types/chat';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 
-export interface MessageBubbleProps {
-  message: Message;
-  onReply?: (messageId: string) => void;
-  onForward?: (messageId: string) => void;
-  onDelete?: (messageId: string) => void;
-  onReact?: (messageId: string, reaction: string) => void;
-  className?: string;
-}
-
-const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '👏', '🔥', '🎉'];
-
-const MessageBubble: React.FC<MessageBubbleProps> = ({
-  message,
-  onReply,
-  onForward,
-  onDelete,
-  onReact,
-  className,
-}) => {
-  const [showActions, setShowActions] = useState(false);
+const ChatList: React.FC = () => {
+  const { conversations, loading, createConversation } = useConversations();
+  const [searchTerm, setSearchTerm] = React.useState('');
   const { user } = useAuth();
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
+  const [isNewGroupOpen, setIsNewGroupOpen] = useState(false);
+  const navigate = useNavigate();
   
-  const isOutgoing = message.sender_id === user?.id;
-  const status: MessageStatus = 'read'; // This would be dynamic in a real app
-  
-  // Format timestamp
-  const timeString = message.created_at 
-    ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
+  const filteredChats = conversations.filter(chat => {
+    const participants = chat.participants || [];
+    const otherParticipants = participants.filter(p => p.user_id !== user?.id);
+    const chatName = chat.is_group 
+      ? chat.name 
+      : otherParticipants[0]?.user?.username || 'Unknown User';
     
-  const timeAgo = message.created_at 
-    ? formatDistanceToNow(new Date(message.created_at), { addSuffix: true })
-    : '';
+    const lastMessage = chat.last_message?.content || '';
     
-  // Check if message should disappear
-  const isDisappearing = !!message.disappears_at;
-  
-  // Organize reactions
-  const reactions = message.reactions || [];
-  const reactionCounts: {[key: string]: number} = {};
-  
-  reactions.forEach(reaction => {
-    reactionCounts[reaction.reaction] = (reactionCounts[reaction.reaction] || 0) + 1;
+    return chatName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      lastMessage.toLowerCase().includes(searchTerm.toLowerCase());
   });
-  
-  const formattedReactions = Object.entries(reactionCounts).map(([emoji, count]) => ({
-    emoji,
-    count,
-  }));
-  
-  // Check if current user has reacted with each emoji
-  const userReactions = reactions
-    .filter(r => r.user_id === user?.id)
-    .map(r => r.reaction);
-    
-  const statusIcon = () => {
-    switch(status) {
-      case 'sending':
-        return <Clock size={14} />;
-      case 'sent':
-        return <Check size={14} />;
-      case 'delivered':
-        return <CheckCheck size={14} />;
-      case 'read':
-        return <CheckCheck size={14} className="text-blue-400" />;
-      default:
-        return null;
+
+  const handleStartDirectChat = async (userId: string) => {
+    if (!user) return;
+    const conversationId = await createConversation([userId]);
+    if (conversationId) {
+      navigate(`/chat/${conversationId}`);
+      setIsNewChatOpen(false);
     }
   };
-  
-  // Render different content based on message type
-  const renderContent = () => {
-    switch (message.content_type) {
-      case 'image':
-        return (
-          <div className="mb-1">
-            <img 
-              src={message.file_url || ''} 
-              alt="Shared image" 
-              className="rounded-lg max-w-full max-h-80 object-contain"
-            />
-            {message.content && <p className="mt-1 text-sm">{message.content}</p>}
-          </div>
-        );
-      case 'video':
-        return (
-          <div className="mb-1">
-            <video
-              src={message.file_url || ''}
-              controls
-              className="rounded-lg max-w-full max-h-80"
-            />
-            {message.content && <p className="mt-1 text-sm">{message.content}</p>}
-          </div>
-        );
-      case 'audio':
-        return (
-          <div className="mb-1">
-            <audio 
-              src={message.file_url || ''} 
-              controls 
-              className="w-full"
-            />
-            {message.content && <p className="mt-1 text-sm">{message.content}</p>}
-          </div>
-        );
-      case 'file':
-        return (
-          <div className="mb-1">
-            <a 
-              href={message.file_url || ''}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center p-2 bg-gray-100 dark:bg-gray-800 rounded"
-            >
-              <span className="flex-1 truncate">{message.content}</span>
-              <span className="ml-2 text-brand-blue">Download</span>
-            </a>
-          </div>
-        );
-      case 'text':
-      default:
-        return <div className="text-sm mb-1">{message.content}</div>;
+
+  const handleCreateGroupChat = async (name: string, userIds: string[]) => {
+    if (!user) return;
+    const conversationId = await createConversation(userIds, name, true);
+    if (conversationId) {
+      navigate(`/chat/${conversationId}`);
+      setIsNewGroupOpen(false);
     }
   };
 
   return (
-    <div
-      className={cn(
-        'flex mb-2',
-        isOutgoing ? 'justify-end' : 'justify-start',
-        className
-      )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
-      <div
-        className={cn(
-          "relative max-w-[80%] rounded-lg px-4 py-2",
-          isOutgoing 
-            ? "bg-brand-blue text-white" 
-            : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100",
-          isDisappearing && "border-2 border-yellow-500"
-        )}
-      >
-        {/* Replied message preview */}
-        {message.replied_to_message && (
-          <div 
-            className={cn(
-              "text-xs p-2 mb-1 rounded border-l-2",
-              isOutgoing 
-                ? "bg-blue-600 border-blue-400" 
-                : "bg-gray-200 dark:bg-gray-700 border-gray-400"
-            )}
-          >
-            <div className="font-medium mb-1">
-              {message.replied_to_message.sender_id === user?.id ? 'You' : message.replied_to_message.sender?.username || 'Unknown'}
-            </div>
-            <div className="truncate">{message.replied_to_message.content}</div>
-          </div>
-        )}
-        
-        {/* Forwarded message indicator */}
-        {message.is_forwarded && (
-          <div className="text-xs italic mb-1 flex items-center">
-            <Forward size={12} className="mr-1" />
-            Forwarded
-          </div>
-        )}
-        
-        {/* Message content */}
-        {renderContent()}
-        
-        {/* Time and status */}
-        <div className="flex items-center justify-end space-x-1.5 text-xs opacity-80">
-          <span title={timeAgo}>{timeString}</span>
-          {isOutgoing && statusIcon()}
-        </div>
-        
-        {/* Reactions */}
-        {formattedReactions.length > 0 && (
-          <div className="flex mt-1 -mb-1 -ml-1">
-            {formattedReactions.map((reaction, index) => (
-              <div 
-                key={index}
-                className={cn(
-                  "flex items-center rounded-full px-1.5 py-0.5 text-xs shadow-subtle mr-1",
-                  userReactions.includes(reaction.emoji)
-                    ? "bg-brand-light-blue dark:bg-blue-900"
-                    : "bg-white/80 dark:bg-gray-800/80"
-                )}
-              >
-                <span className="mr-1">{reaction.emoji}</span>
-                <span>{reaction.count}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Message actions */}
-        {showActions && (
-          <div 
-            className={cn(
-              "absolute -top-4 flex items-center space-x-1",
-              isOutgoing ? "right-0" : "left-0"
-            )}
-          >
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="p-1 bg-white dark:bg-gray-800 rounded-full shadow-md">
-                  <Smile size={16} className="text-gray-600 dark:text-gray-400" />
+    <div className="w-full h-full bg-white dark:bg-gray-900 border-r flex flex-col">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">Messages</h1>
+          <div className="flex items-center space-x-2">
+            <Dialog open={isNewChatOpen} onOpenChange={setIsNewChatOpen}>
+              <DialogTrigger asChild>
+                <button className="text-brand-blue hover:bg-brand-light-blue p-2 rounded-full transition-colors">
+                  <UserPlus size={22} />
                 </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2 flex space-x-1">
-                {EMOJI_OPTIONS.map(emoji => (
-                  <button
-                    key={emoji}
-                    className="text-xl hover:bg-gray-100 dark:hover:bg-gray-800 p-1 rounded"
-                    onClick={() => onReact?.(message.id, emoji)}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Conversation</DialogTitle>
+                </DialogHeader>
+                <NewDirectChatForm onStartChat={handleStartDirectChat} />
+              </DialogContent>
+            </Dialog>
             
-            <button 
-              className="p-1 bg-white dark:bg-gray-800 rounded-full shadow-md"
-              onClick={() => onReply?.(message.id)}
-            >
-              <Reply size={16} className="text-gray-600 dark:text-gray-400" />
-            </button>
-            
-            <button 
-              className="p-1 bg-white dark:bg-gray-800 rounded-full shadow-md"
-              onClick={() => onForward?.(message.id)}
-            >
-              <Forward size={16} className="text-gray-600 dark:text-gray-400" />
-            </button>
-            
-            {isOutgoing && (
-              <button 
-                className="p-1 bg-white dark:bg-gray-800 rounded-full shadow-md text-red-500"
-                onClick={() => onDelete?.(message.id)}
-              >
-                <Trash size={16} />
-              </button>
-            )}
+            <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
+              <DialogTrigger asChild>
+                <button className="text-brand-blue hover:bg-brand-light-blue p-2 rounded-full transition-colors">
+                  <PlusCircle size={22} />
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Group Chat</DialogTitle>
+                </DialogHeader>
+                <NewGroupChatForm onCreateGroup={handleCreateGroupChat} />
+              </DialogContent>
+            </Dialog>
           </div>
+        </div>
+        <div className="relative">
+          <Search 
+            size={18} 
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" 
+          />
+          <input
+            type="text"
+            placeholder="Search messages"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input bg-background focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none"
+          />
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full p-4">
+            <p className="text-muted-foreground">Loading conversations...</p>
+          </div>
+        ) : filteredChats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+            <p className="text-muted-foreground mb-4">No conversations found</p>
+            <Button onClick={() => setIsNewChatOpen(true)}>Start a Conversation</Button>
+          </div>
+        ) : (
+          <ul>
+            {filteredChats.map((chat) => (
+              <ChatListItem key={chat.id} chat={chat} currentUserId={user?.id} />
+            ))}
+          </ul>
         )}
       </div>
     </div>
   );
 };
 
-export default MessageBubble;
+interface ChatItemProps {
+  chat: Conversation;
+  currentUserId: string | undefined;
+}
+
+const ChatListItem: React.FC<ChatItemProps> = ({ chat, currentUserId }) => {
+  const { chatId } = useParams();
+  const isActive = chatId === chat.id;
+  
+  const participants = chat.participants || [];
+  const otherParticipants = participants.filter(p => p.user_id !== currentUserId);
+  
+  // For direct messages, show the other person's name
+  // For group chats, show the group name
+  const chatName = chat.is_group 
+    ? chat.name 
+    : otherParticipants[0]?.user?.username || 'Unknown User';
+
+  // Get the avatar for direct messages or first letter for group chats
+  const avatarText = chat.is_group 
+    ? (chat.name || 'G').charAt(0).toUpperCase()
+    : (otherParticipants[0]?.user?.username || 'U').charAt(0).toUpperCase();
+    
+  // Get avatar status for direct messages
+  const status = chat.is_group 
+    ? null 
+    : getRandomStatus(); // This would be replaced with actual online status
+    
+  // Calculate unread messages (placeholder)
+  const unread = Math.floor(Math.random() * 5); // This would be replaced with actual unread count
+  
+  // Format the time
+  const time = chat.last_message?.created_at 
+    ? formatDistanceToNow(new Date(chat.last_message.created_at), { addSuffix: true })
+    : 'No messages';
+    
+  // Get the last message content
+  const lastMessage = chat.last_message?.content || 'No messages yet';
+  
+  // Helper function for random status (placeholder)
+  function getRandomStatus() {
+    const statuses = ['online', 'away', 'offline', 'busy'];
+    return statuses[Math.floor(Math.random() * statuses.length)] as 'online' | 'away' | 'offline' | 'busy';
+  }
+  
+  return (
+    <li>
+      <Link
+        to={`/chat/${chat.id}`}
+        className={cn(
+          "flex items-center p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-l-2 border-transparent",
+          isActive && "bg-brand-light-blue dark:bg-gray-800/80 border-l-2 border-brand-blue"
+        )}
+      >
+        <Avatar 
+          className={!chat.is_group && status ? `border-2 border-${status === 'online' ? 'green' : status === 'away' ? 'yellow' : status === 'busy' ? 'red' : 'gray'}-500` : ''}
+        >
+          <span className="flex h-full w-full items-center justify-center font-medium">
+            {avatarText}
+          </span>
+        </Avatar>
+        <div className="ml-3 flex-1 overflow-hidden">
+          <div className="flex justify-between items-baseline">
+            <h3 className="font-medium truncate">{chatName}</h3>
+            <span className="text-xs text-gray-500 whitespace-nowrap ml-2">{time}</span>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{lastMessage}</p>
+            {unread > 0 && (
+              <span className="ml-2 flex-shrink-0 w-5 h-5 bg-brand-blue rounded-full text-xs text-white flex items-center justify-center">
+                {unread}
+              </span>
+            )}
+          </div>
+        </div>
+      </Link>
+    </li>
+  );
+};
+
+const NewDirectChatForm: React.FC<{ onStartChat: (userId: string) => void }> = ({ onStartChat }) => {
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${searchUsername}%`)
+        .neq('id', user?.id || '')
+        .limit(10);
+        
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error: any) {
+      console.error('Error searching users:', error.message);
+      toast.error('Failed to search users');
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Auto-search when the user types
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchUsername.trim()) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchUsername]);
+  
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex space-x-2">
+        <Input
+          placeholder="Search by username"
+          value={searchUsername}
+          onChange={(e) => setSearchUsername(e.target.value)}
+          className="flex-1"
+        />
+      </div>
+      
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {searchResults.length === 0 ? (
+          <p className="text-center text-muted-foreground py-4">
+            {searchUsername.trim() && !loading ? 'No users found' : 'Search for users to start a conversation'}
+          </p>
+        ) : (
+          searchResults.map(user => (
+            <div key={user.id} className="flex items-center justify-between p-3 border rounded-md">
+              <div className="flex items-center">
+                <Avatar>
+                  <span className="flex h-full w-full items-center justify-center font-medium">
+                    {(user.username || 'U').charAt(0).toUpperCase()}
+                  </span>
+                </Avatar>
+                <span className="ml-3">{user.username}</span>
+              </div>
+              <Button size="sm" onClick={() => onStartChat(user.id)}>
+                Chat
+              </Button>
+            </div>
+          ))
+        )}
+        {loading && (
+          <p className="text-center text-muted-foreground py-2">Searching...</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const NewGroupChatForm: React.FC<{ onCreateGroup: (name: string, userIds: string[]) => void }> = ({ onCreateGroup }) => {
+  const [groupName, setGroupName] = useState('');
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${searchUsername}%`)
+        .neq('id', user?.id)
+        .limit(10);
+        
+      if (error) throw error;
+      
+      // Filter out already selected users
+      const filteredResults = (data || []).filter(
+        result => !selectedUsers.some(selected => selected.id === result.id)
+      );
+      
+      setSearchResults(filteredResults);
+    } catch (error: any) {
+      console.error('Error searching users:', error.message);
+      toast.error('Failed to search users');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const addUser = (user: any) => {
+    setSelectedUsers([...selectedUsers, user]);
+    setSearchResults(searchResults.filter(result => result.id !== user.id));
+    setSearchUsername('');
+  };
+  
+  const removeUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter(selected => selected.id !== userId));
+  };
+  
+  const handleCreateGroup = () => {
+    if (!groupName.trim()) {
+      toast.error('Please enter a group name');
+      return;
+    }
+    
+    if (selectedUsers.length === 0) {
+      toast.error('Please add at least one user to the group');
+      return;
+    }
+    
+    const userIds = selectedUsers.map(user => user.id);
+    onCreateGroup(groupName, userIds);
+  };
+  
+  return (
+    <div className="space-y-4 mt-4">
+      <Input
+        placeholder="Group Name"
+        value={groupName}
+        onChange={(e) => setGroupName(e.target.value)}
+      />
+      
+      <div className="flex flex-wrap gap-2 min-h-8">
+        {selectedUsers.map(user => (
+          <div key={user.id} className="flex items-center bg-brand-light-blue text-brand-blue px-2 py-1 rounded-full text-sm">
+            {user.username}
+            <button className="ml-1" onClick={() => removeUser(user.id)}>×</button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex space-x-2">
+        <Input
+          placeholder="Search users to add"
+          value={searchUsername}
+          onChange={(e) => setSearchUsername(e.target.value)}
+        />
+        <Button onClick={handleSearch} disabled={loading}>
+          {loading ? '...' : 'Search'}
+        </Button>
+      </div>
+      
+      <div className="space-y-2 max-h-40 overflow-y-auto">
+        {searchResults.map(user => (
+          <div key={user.id} className="flex items-center justify-between p-2 border rounded-md">
+            <span>{user.username}</span>
+            <Button size="sm" variant="outline" onClick={() => addUser(user)}>
+              Add
+            </Button>
+          </div>
+        ))}
+      </div>
+      
+      <Button className="w-full" onClick={handleCreateGroup} disabled={!groupName.trim() || selectedUsers.length === 0}>
+        Create Group Chat
+      </Button>
+    </div>
+  );
+};
+
+export default ChatList;
