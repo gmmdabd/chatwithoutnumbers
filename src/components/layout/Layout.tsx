@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MessageSquare, User, Settings, LogOut } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,7 +11,8 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const isLoggedIn = true; // This will be replaced with actual auth state
+  const { session, user, signOut } = useAuth();
+  const isLoggedIn = !!session;
   
   if (location.pathname === '/auth') {
     return <>{children}</>; // No layout on auth page
@@ -30,7 +32,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <NavLink to="/settings" label="Settings" icon={<Settings size={18} />} />
             </nav>
             <div className="flex items-center space-x-2">
-              <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <button 
+                onClick={signOut}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
                 <LogOut size={20} className="text-gray-600 dark:text-gray-400" />
               </button>
             </div>

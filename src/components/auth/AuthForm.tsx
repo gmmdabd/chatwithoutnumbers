@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, User, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type FormMode = 'login' | 'register';
 
@@ -15,6 +18,14 @@ const AuthForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn, signUp, session } = useAuth();
+  
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (session) {
+      navigate('/chat');
+    }
+  }, [session, navigate]);
 
   const toggleMode = () => {
     setMode(mode === 'login' ? 'register' : 'login');
@@ -24,20 +35,14 @@ const AuthForm: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate authentication process
     try {
-      // Replace with actual authentication logic
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast.success(
-        mode === 'login' 
-          ? 'Successfully logged in!' 
-          : 'Account created successfully!'
-      );
-      
-      navigate('/chat');
+      if (mode === 'login') {
+        await signIn(email, password);
+      } else {
+        await signUp(email, password, username);
+      }
     } catch (error) {
-      toast.error('Authentication failed. Please try again.');
+      console.error('Authentication error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -60,20 +65,18 @@ const AuthForm: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
             <div className="space-y-2">
-              <label htmlFor="username" className="text-sm font-medium">
-                Username
-              </label>
+              <Label htmlFor="username">Username</Label>
               <div className="relative">
                 <User 
                   size={18} 
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" 
                 />
-                <input
+                <Input
                   id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full rounded-lg border border-input bg-background focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none"
+                  className="pl-10"
                   placeholder="Choose a username"
                   required
                 />
@@ -82,20 +85,18 @@ const AuthForm: React.FC = () => {
           )}
           
           <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
+            <Label htmlFor="email">Email</Label>
             <div className="relative">
               <Mail 
                 size={18} 
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" 
               />
-              <input
+              <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full rounded-lg border border-input bg-background focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none"
+                className="pl-10"
                 placeholder="Enter your email"
                 required
               />
@@ -104,9 +105,7 @@ const AuthForm: React.FC = () => {
           
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
+              <Label htmlFor="password">Password</Label>
               {mode === 'login' && (
                 <a href="#" className="text-xs text-brand-blue hover:underline">
                   Forgot password?
@@ -118,12 +117,12 @@ const AuthForm: React.FC = () => {
                 size={18} 
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" 
               />
-              <input
+              <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10 py-2 w-full rounded-lg border border-input bg-background focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none"
+                className="pl-10 pr-10"
                 placeholder={mode === 'login' ? 'Enter your password' : 'Create a password'}
                 required
               />

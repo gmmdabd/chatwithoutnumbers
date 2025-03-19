@@ -3,8 +3,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Lock, MessageSquare, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index: React.FC = () => {
+  const { session } = useAuth();
+  const isLoggedIn = !!session;
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
@@ -24,7 +28,7 @@ const Index: React.FC = () => {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-slide-in">
             <Link
-              to="/auth"
+              to={isLoggedIn ? "/chat" : "/auth"}
               className={cn(
                 "px-8 py-3 rounded-lg text-white font-medium",
                 "bg-brand-blue hover:bg-blue-600 shadow-lg shadow-blue-500/20",
@@ -32,7 +36,7 @@ const Index: React.FC = () => {
                 "transform hover:translate-y-[-2px]"
               )}
             >
-              Get Started
+              {isLoggedIn ? "Go to Messages" : "Get Started"}
               <ArrowRight size={18} className="ml-2" />
             </Link>
             
@@ -139,14 +143,14 @@ const Index: React.FC = () => {
           </p>
           
           <Link
-            to="/auth"
+            to={isLoggedIn ? "/chat" : "/auth"}
             className={cn(
               "inline-flex items-center px-8 py-3 rounded-lg text-white font-medium",
               "bg-brand-blue hover:bg-blue-600 shadow-lg shadow-blue-500/20",
               "transition-all duration-200 transform hover:translate-y-[-2px]"
             )}
           >
-            Create Your Account
+            {isLoggedIn ? "Go to Messages" : "Create Your Account"}
             <ArrowRight size={18} className="ml-2" />
           </Link>
         </div>
