@@ -42,10 +42,16 @@ export const useMessages = (conversationId: string | undefined) => {
             };
           }
           
+          // Handle sender properly checking if it's a valid object or an error object
+          const typedSender = msg.sender && 
+            typeof msg.sender === 'object' && 
+            !('error' in msg.sender) ? 
+            msg.sender : null;
+          
           return {
             ...msg,
             content_type: (msg.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
-            sender: msg.sender && (typeof msg.sender !== 'string' && !msg.sender.error) ? msg.sender : null,
+            sender: typedSender,
             replied_to_message: typedRepliedToMessage,
             reactions: msg.reactions || []
           };
