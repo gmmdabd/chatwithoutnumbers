@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, PlusCircle } from 'lucide-react';
-import Avatar from '@/components/ui/Avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 // Dummy data for chat list
@@ -14,7 +14,7 @@ const dummyChats = [
     time: '2m ago',
     unread: 3,
     avatar: null,
-    status: 'online',
+    status: 'online' as const,
   },
   {
     id: '2',
@@ -23,7 +23,7 @@ const dummyChats = [
     time: '1h ago',
     unread: 0,
     avatar: null,
-    status: 'away',
+    status: 'away' as const,
   },
   {
     id: '3',
@@ -32,7 +32,7 @@ const dummyChats = [
     time: '3h ago',
     unread: 0,
     avatar: null,
-    status: 'offline',
+    status: 'offline' as const,
   },
   {
     id: '4',
@@ -50,7 +50,7 @@ const dummyChats = [
     time: 'Yesterday',
     unread: 0,
     avatar: null,
-    status: 'busy',
+    status: 'busy' as const,
   },
 ];
 
@@ -130,10 +130,12 @@ const ChatListItem: React.FC<ChatItemProps> = ({ chat }) => {
         )}
       >
         <Avatar 
-          initials={chat.name.split(' ').map(n => n[0]).join('')} 
-          status={chat.status}
-          size="md"
-        />
+          className={chat.status ? `border-2 border-${chat.status === 'online' ? 'green' : chat.status === 'away' ? 'yellow' : chat.status === 'busy' ? 'red' : 'gray'}-500` : ''}
+        >
+          <span className="flex h-full w-full items-center justify-center font-medium">
+            {chat.name.split(' ').map(n => n[0]).join('')}
+          </span>
+        </Avatar>
         <div className="ml-3 flex-1 overflow-hidden">
           <div className="flex justify-between items-baseline">
             <h3 className="font-medium truncate">{chat.name}</h3>

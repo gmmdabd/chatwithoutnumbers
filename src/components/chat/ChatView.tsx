@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send, Paperclip, Mic, Image, Smile } from 'lucide-react';
-import Avatar from '@/components/ui/Avatar';
+import { Avatar } from '@/components/ui/avatar';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { toast } from 'sonner';
 
@@ -109,7 +108,6 @@ const ChatView: React.FC = () => {
     setMessages([...messages, newMsg]);
     setNewMessage('');
     
-    // Simulate message sending and status updates
     setTimeout(() => {
       setMessages(msgs => 
         msgs.map(msg => 
@@ -160,11 +158,11 @@ const ChatView: React.FC = () => {
         <Link to="/chat" className="lg:hidden mr-2 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
           <ArrowLeft size={20} />
         </Link>
-        <Avatar 
-          initials={contact.name.split(' ').map(n => n[0]).join('')} 
-          status={contact.status}
-          size="md"
-        />
+        <Avatar className={contact.status ? `border-2 border-${contact.status === 'online' ? 'green' : contact.status === 'away' ? 'yellow' : contact.status === 'busy' ? 'red' : 'gray'}-500` : ''}>
+          <span className="flex h-full w-full items-center justify-center font-medium">
+            {contact.name.split(' ').map(n => n[0]).join('')}
+          </span>
+        </Avatar>
         <div className="ml-3">
           <h2 className="font-semibold">{contact.name}</h2>
           <p className="text-xs text-gray-500">
