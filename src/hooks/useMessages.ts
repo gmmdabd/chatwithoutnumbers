@@ -38,14 +38,14 @@ export const useMessages = (conversationId: string | undefined) => {
             typedRepliedToMessage = {
               ...msg.replied_to_message,
               content_type: (msg.replied_to_message.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
-              sender: msg.replied_to_message.sender || null
+              sender: null // Handle the case when replied_to_message has no sender data yet
             };
           }
           
           return {
             ...msg,
             content_type: (msg.content_type || 'text') as 'text' | 'image' | 'video' | 'audio' | 'file',
-            sender: msg.sender || null,
+            sender: msg.sender && (typeof msg.sender !== 'string' && !msg.sender.error) ? msg.sender : null,
             replied_to_message: typedRepliedToMessage,
             reactions: msg.reactions || []
           };
