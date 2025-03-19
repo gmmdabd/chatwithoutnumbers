@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				brand: {
+					blue: '#0A84FF',
+					'light-blue': '#E5F4FF',
+					gray: '#8E8E93',
+					'light-gray': '#F8F8FA',
+					'dark-gray': '#1C1C1E',
 				}
 			},
 			borderRadius: {
@@ -84,11 +92,71 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'fade-in': {
+					from: {
+						opacity: '0'
+					},
+					to: {
+						opacity: '1'
+					}
+				},
+				'fade-out': {
+					from: {
+						opacity: '1'
+					},
+					to: {
+						opacity: '0'
+					}
+				},
+				'slide-in': {
+					from: {
+						transform: 'translateY(20px)',
+						opacity: '0'
+					},
+					to: {
+						transform: 'translateY(0)',
+						opacity: '1'
+					}
+				},
+				'slide-out': {
+					from: {
+						transform: 'translateY(0)',
+						opacity: '1'
+					},
+					to: {
+						transform: 'translateY(20px)',
+						opacity: '0'
+					}
+				},
+				'bubble-in': {
+					from: {
+						transform: 'scale(0.9)',
+						opacity: '0'
+					},
+					to: {
+						transform: 'scale(1)',
+						opacity: '1'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.3s ease-out',
+				'fade-out': 'fade-out 0.3s ease-out',
+				'slide-in': 'slide-in 0.4s ease-out',
+				'slide-out': 'slide-out 0.4s ease-out',
+				'bubble-in': 'bubble-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+			},
+			fontFamily: {
+				sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+			},
+			boxShadow: {
+				'message': '0 2px 8px rgba(0, 0, 0, 0.04)',
+				'hover': '0 4px 12px rgba(0, 0, 0, 0.08)',
+				'card': '0 8px 30px rgba(0, 0, 0, 0.06)',
+				'subtle': '0 1px 3px rgba(0, 0, 0, 0.05)'
 			}
 		}
 	},
